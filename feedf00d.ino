@@ -79,18 +79,17 @@ void setup()   {
 char* now() {
 	Time t = rtc.time();
 	static char buf[128];
-	sprintf(buf, "%02d:%02d:%02d %02d/%02d",
+	sprintf(buf, "%02d:%02d:%02d %02d-%02d",
 		t.hr, t.min, t.sec,
 	 	t.mon, t.date
 	 	);
 	return buf;
 }
 
-char* readRadio() {
+char* readRadio(uint8_t* pipenum = NULL) {
 	static char buff[RF_PAYLOAD_MAX + 1];
 	memset(buff, 0, RF_PAYLOAD_MAX + 1);
-	strcpy(buff, "NOSIGAL");
-	if (radio.available()) {
+	if (radio.available(pipenum)) {
 		radio.read(buff, radio.getDynamicPayloadSize());
 		char s[128] = {0};
 		snprintf(s, 128, "%d:%s", radio.getDynamicPayloadSize(), buff);
@@ -128,10 +127,19 @@ void loop() {
 	display.print(anim.nextFrame());
 
 	char* buf = 0;
-	if (buf = readRadio()) {
+	uint8_t chanNum = -1;
+	if (buf = readRadio(&chanNum)) {
 		display.setCursor(0, 16);
 		display.setTextSize(2);
 		display.println(buf);
+		display.setCursor(0, 56);
+		display.setTextSize(1);
+		display.print("CH");
+		display.println(chanNum);
+	} else {
+		display.setCursor(0, 56);
+		display.setTextSize(1);
+		display.println("E:no signal");
 	}
 	display.display();
 	delay(1000);
