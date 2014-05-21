@@ -24,6 +24,7 @@ All text above, and the splash screen must be included in any redistribution
 #include <DS1302.h>
 #include <RF24.h>
 
+
 const int RF_PAYLOAD_MAX = 32;
 const int RF_PIN_CE  =  9;
 const int RF_PIN_CSN = 10;
@@ -66,40 +67,22 @@ void setup()   {
 
 
 	// 如果需要，可以重设时间
-	Time t(2014, 5, 18, 21, 59, 55, Time::kSunday);
-	rtc.writeProtect(true);
-	rtc.time(t);
+	// rtc.time(Time(2014, 5, 21, 23, 15, 10, Time::kSunday));
+	rtc.writeProtect(false);
 	rtc.halt(false);
 
 	display.begin(SSD1306_SWITCHCAPVCC);
 	display.display();
-	delay(200);
-	display.clearDisplay();
-}
-
-char* dayOfWeek(const Time::Day day) {
-	static char buff[64];
-	switch (day) {
-		case Time::kSunday: return strcpy(buff, "Sunday"), buff;
-		case Time::kMonday: return strcpy(buff, "Monday"), buff;
-		case Time::kTuesday: return strcpy(buff, "Tuesday"), buff;
-		case Time::kWednesday: return strcpy(buff, "Wednesday"), buff;
-		case Time::kThursday: return strcpy(buff, "Thursday"), buff;
-		case Time::kFriday: return strcpy(buff, "Friday"), buff;
-		case Time::kSaturday: return strcpy(buff, "Saturday"), buff;
-	}
-	return "(unknown day)";
+	delay(500);
 }
 
 char* now() {
 	Time t = rtc.time();
 	static char buf[128];
-	sprintf(buf, "%02d:%02d:%02d", t.hr, t.min, t.sec);
-	// sprintf(buf, "%02d:%02d:%02d\n%04d-%02d-%02d %s",
-	// 	t.hr, t.min, t.sec,
-	// 	t.yr, t.mon, t.date,
-	// 	dayOfWeek(t.day)
-	// 	);
+	sprintf(buf, "%02d:%02d:%02d %02d/%02d",
+		t.hr, t.min, t.sec,
+	 	t.mon, t.date
+	 	);
 	return buf;
 }
 
@@ -117,21 +100,41 @@ char* readRadio() {
 	return 0;
 }
 
+const char* keyframe[] = {">  ", ">> ", ">>>"};
+#define countof(lst) (sizeof(lst)/sizeof(lst[0]))
 void loop() {
+	static class Anim {
+		int index;
+	public:
+		Anim() : index(0) {
+		}
+		const char* nextFrame() {
+			int current = index;
+			index = ++index % countof(keyframe);
+			return keyframe[current];
+		}
+	} anim;
+
+
 	display.clearDisplay();
-	display.setTextSize(2);
+
+	display.setTextSize(1);
 	display.setTextColor(WHITE);
 	display.setCursor(0,0);
 	display.println(now());
-	display.display();
+
+	display.setTextSize(1);
+	display.setCursor(106,0);
+	display.print(anim.nextFrame());
 
 	char* buf = 0;
 	if (buf = readRadio()) {
 		display.setCursor(0, 16);
 		display.setTextSize(2);
 		display.println(buf);
-		display.display();
 	}
+	display.display();
+	delay(1000);
 }
 
 int serial_putc( char c, FILE * )
