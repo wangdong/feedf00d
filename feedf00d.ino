@@ -20,28 +20,27 @@ All text above, and the splash screen must be included in any redistribution
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
 #include <DS1302.h>
 #include <RF24.h>
 
+#include <Max72xxPanel.h>
+
+int pinCS = 8; // Attach CS to this pin, DIN to MOSI and CLK to SCK (cf http://arduino.cc/en/Reference/SPI )
+int numberOfHorizontalDisplays = 2;
+int numberOfVerticalDisplays = 1;
+
+Max72xxPanel matrix = Max72xxPanel(pinCS, numberOfHorizontalDisplays, numberOfVerticalDisplays);
 
 const int RF_PAYLOAD_MAX = 32;
 const int RF_PIN_CE  =  9;
 const int RF_PIN_CSN = 10;
 RF24 radio(RF_PIN_CE, RF_PIN_CSN);
 
-const int kCePin   = 2;  // Chip Enable
-const int kIoPin   = 3;  // Input/Output
-const int kSclkPin = 4;  // Serial Clock
+const int kCePin   = 5;  // Chip Enable
+const int kIoPin   = 6;  // Input/Output
+const int kSclkPin = 7;  // Serial Clock
 DS1302 rtc(kCePin, kIoPin, kSclkPin);
 
-// If using software SPI (the default case):
-#define OLED_MOSI  6
-#define OLED_CLK   5
-#define OLED_DC    8
-#define OLED_CS    20
-#define OLED_RESET 7
-Adafruit_SSD1306 display(OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
 
 void setup()   {
 	Serial.begin(9600);
@@ -67,13 +66,11 @@ void setup()   {
 
 
 	// 如果需要，可以重设时间
-	// rtc.time(Time(2014, 5, 21, 23, 15, 10, Time::kSunday));
+	// rtc.time(Time(2014, 5, 25, 1, 58, 30, Time::kSunday));
 	rtc.writeProtect(false);
 	rtc.halt(false);
 
-	display.begin(SSD1306_SWITCHCAPVCC);
-	display.display();
-	delay(500);
+	matrix.setIntensity(0); // Use a value between 0 and 15 for brightness
 }
 
 char* now() {
@@ -99,50 +96,40 @@ char* readRadio(uint8_t* pipenum = NULL) {
 	return 0;
 }
 
-const char* keyframe[] = {">  ", ">> ", ">>>"};
-#define countof(lst) (sizeof(lst)/sizeof(lst[0]))
+int spacer = 1;
+int width = 5 + spacer; // The font width is 5 pixels
+int spd = 30;
+
 void loop() {
-	static class Anim {
-		int index;
-	public:
-		Anim() : index(0) {
-		}
-		const char* nextFrame() {
-			int current = index;
-			index = ++index % countof(keyframe);
-			return keyframe[current];
-		}
-	} anim;
-
-
-	display.clearDisplay();
-
-	display.setTextSize(1);
-	display.setTextColor(WHITE);
-	display.setCursor(0,0);
-	display.println(now());
-
-	display.setTextSize(1);
-	display.setCursor(106,0);
-	display.print(anim.nextFrame());
-
+	String tape = now();
 	char* buf = 0;
 	uint8_t chanNum = -1;
 	if (buf = readRadio(&chanNum)) {
-		display.setCursor(0, 16);
-		display.setTextSize(2);
-		display.println(buf);
-		display.setCursor(0, 56);
-		display.setTextSize(1);
-		display.print("CH");
-		display.println(chanNum);
+		tape += " ";
+		tape += buf;
 	} else {
-		display.setCursor(0, 56);
-		display.setTextSize(1);
-		display.println("E:no signal");
+		tape += " NOSIG";
 	}
-	display.display();
-	delay(1000);
+	for ( int i = 0 ; i < width * tape.length() + matrix.width() - 1 - spacer; i++ ) {
+
+		matrix.fillScreen(LOW);
+
+		int letter = i / width;
+		int x = (matrix.width() - 1) - i % width;
+		int y = (matrix.height() - 8) / 2; // center the text vertically
+
+		while ( x + width - spacer >= 0 && letter >= 0 ) {
+		  if ( letter < tape.length() ) {
+		    matrix.drawChar(x, y, tape[letter], HIGH, LOW, 1);
+		  }
+
+		  letter--;
+		  x -= width;
+		}
+
+		matrix.write(); // Send bitmap to display
+		delay(spd);
+	}
 }
 
 int serial_putc( char c, FILE * )
