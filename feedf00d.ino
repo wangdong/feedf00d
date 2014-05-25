@@ -76,9 +76,8 @@ void setup()   {
 char* now() {
 	Time t = rtc.time();
 	static char buf[128];
-	sprintf(buf, "%02d:%02d:%02d %02d-%02d",
-		t.hr, t.min, t.sec,
-	 	t.mon, t.date
+	sprintf(buf, "%02d:%02d",
+		t.hr, t.min
 	 	);
 	return buf;
 }
@@ -100,15 +99,16 @@ int spacer = 1;
 int width = 5 + spacer; // The font width is 5 pixels
 int spd = 30;
 
+String todoMsg;
+
 void loop() {
 	String tape = now();
 	char* buf = 0;
 	uint8_t chanNum = -1;
 	if (buf = readRadio(&chanNum)) {
-		tape += " ";
-		tape += buf;
-	} else {
-		tape += " NOSIG";
+		todoMsg  = " todo ";
+		todoMsg += buf;
+		tape += todoMsg;
 	}
 	for ( int i = 0 ; i < width * tape.length() + matrix.width() - 1 - spacer; i++ ) {
 
