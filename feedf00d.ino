@@ -18,98 +18,111 @@ All text above, and the splash screen must be included in any redistribution
 #include <stdio.h>
 #include <string.h>
 #include <SPI.h>
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <DS1302.h>
-#include <RF24.h>
 
+
+//
+// Pin Map
+//
+const int PIN_CE_DS1302     = 5;
+const int PIN_IO_DS1302     = 6;
+const int PIN_SCK_DS1302    = 7;
+const int PIN_CSN_LEDMATRIX = 8;
+const int PIN_CE_RF24       = 9;
+const int PIN_CSN_RF24      = 10;
+
+//
+// LED Matrix
+//
+#include <Adafruit_GFX.h>
 #include <Max72xxPanel.h>
 
-int pinCS = 8; // Attach CS to this pin, DIN to MOSI and CLK to SCK (cf http://arduino.cc/en/Reference/SPI )
-int numberOfHorizontalDisplays = 2;
-int numberOfVerticalDisplays = 1;
+String lastMsg;
 
-Max72xxPanel matrix = Max72xxPanel(pinCS, numberOfHorizontalDisplays, numberOfVerticalDisplays);
+const int spacer 					= 1;
+const int width 					= 5 + spacer; // The font width is 5 pixels
+const int scroll_speed 				= 30;
+const int countHorizontalDisplays 	= 2;
+const int countVerticalDisplays   	= 1;
+Max72xxPanel matrix(PIN_CSN_LEDMATRIX, countHorizontalDisplays, countVerticalDisplays);
 
+//
+// RF24
+//
+#include <RF24.h>
 const int RF_PAYLOAD_MAX = 32;
-const int RF_PIN_CE  =  9;
-const int RF_PIN_CSN = 10;
-RF24 radio(RF_PIN_CE, RF_PIN_CSN);
+RF24 radio(PIN_CE_RF24, PIN_CSN_RF24);
 
-const int kCePin   = 5;  // Chip Enable
-const int kIoPin   = 6;  // Input/Output
-const int kSclkPin = 7;  // Serial Clock
-DS1302 rtc(kCePin, kIoPin, kSclkPin);
+//
+// RTC
+//
+#include <DS1302.h>
+DS1302 rtc(PIN_CE_DS1302, PIN_IO_DS1302, PIN_SCK_DS1302);
 
 
 void setup()   {
 	Serial.begin(9600);
 
+	//
+	// RADIO
+	// 
 	radio.begin();
 	radio.setDataRate(RF24_2MBPS);
 	radio.setChannel(24);
 	radio.openReadingPipe(0, 0x00FEEDF00D00ULL);
-	radio.openReadingPipe(1, 0x00FEEDF00D01ULL);
-	radio.openReadingPipe(2, 0x00FEEDF00D02ULL);
-	radio.openReadingPipe(3, 0x00FEEDF00D03ULL);
-	radio.openReadingPipe(4, 0x00FEEDF00D04ULL);
-	radio.openReadingPipe(5, 0x00FEEDF00D05ULL);
+	radio.openReadingPipe(1, 0x00FEEDF00D11ULL);
+	radio.openReadingPipe(2, 0x00FEEDF00D12ULL);
+	radio.openReadingPipe(3, 0x00FEEDF00D13ULL);
+	radio.openReadingPipe(4, 0x00FEEDF00D14ULL);
+	radio.openReadingPipe(5, 0x00FEEDF00D15ULL);
 	radio.setCRCLength(RF24_CRC_16);
 	radio.enableDynamicPayloads();
 	radio.setAutoAck(true);
-
 
 	radio.startListening();
 
 	printf_begin();
 	radio.printDetails();
 
-
+	//
+	// RTC
+	//
 	// 如果需要，可以重设时间
 	// rtc.time(Time(2014, 5, 25, 1, 58, 30, Time::kSunday));
 	rtc.writeProtect(false);
 	rtc.halt(false);
 
+	//
+	// LED Matrix
+	//
 	matrix.setIntensity(0); // Use a value between 0 and 15 for brightness
 }
 
 char* now() {
+	static char buf[32];
 	Time t = rtc.time();
-	static char buf[128];
-	sprintf(buf, "%02d:%02d",
-		t.hr, t.min
-	 	);
+	sprintf(buf, "%02d:%02d", t.hr, t.min);
 	return buf;
 }
 
-char* readRadio(uint8_t* pipenum = NULL) {
+const char* readRadio(uint8_t* pipenum = NULL) {
 	static char buff[RF_PAYLOAD_MAX + 1];
 	memset(buff, 0, RF_PAYLOAD_MAX + 1);
 	if (radio.available(pipenum)) {
 		radio.read(buff, radio.getDynamicPayloadSize());
-		char s[128] = {0};
-		snprintf(s, 128, "%d:%s", radio.getDynamicPayloadSize(), buff);
-		Serial.println(s);
 		return buff;
 	}
 	return 0;
 }
 
-int spacer = 1;
-int width = 5 + spacer; // The font width is 5 pixels
-int spd = 30;
-
-String todoMsg;
-
 void loop() {
-	String tape = now();
-	char* buf = 0;
-	uint8_t chanNum = -1;
-	if (buf = readRadio(&chanNum)) {
-		todoMsg  = " todo ";
-		todoMsg += buf;
-		tape += todoMsg;
+	if (const char* buf = readRadio()) {
+		lastMsg  = " todo ";
+		lastMsg += buf;
 	}
+	
+	String tape = now();
+	tape += lastMsg;
+
 	for ( int i = 0 ; i < width * tape.length() + matrix.width() - 1 - spacer; i++ ) {
 
 		matrix.fillScreen(LOW);
@@ -119,16 +132,15 @@ void loop() {
 		int y = (matrix.height() - 8) / 2; // center the text vertically
 
 		while ( x + width - spacer >= 0 && letter >= 0 ) {
-		  if ( letter < tape.length() ) {
-		    matrix.drawChar(x, y, tape[letter], HIGH, LOW, 1);
-		  }
-
-		  letter--;
-		  x -= width;
+			if ( letter < tape.length() ) {
+				matrix.drawChar(x, y, tape[letter], HIGH, LOW, 1);
+			}
+			letter--;
+			x -= width;
 		}
 
-		matrix.write(); // Send bitmap to display
-		delay(spd);
+		matrix.write();
+		delay(scroll_speed);
 	}
 }
 
