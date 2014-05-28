@@ -40,7 +40,7 @@ String lastMsg;
 
 const int spacer 					= 1;
 const int width 					= 5 + spacer; // The font width is 5 pixels
-const int scroll_speed 				= 30;
+const int scroll_speed 				= 25;
 const int countHorizontalDisplays 	= 2;
 const int countVerticalDisplays   	= 1;
 Max72xxPanel matrix(PIN_CSN_LEDMATRIX, countHorizontalDisplays, countVerticalDisplays);
@@ -68,15 +68,16 @@ void setup()   {
 	radio.begin();
 	radio.setDataRate(RF24_2MBPS);
 	radio.setChannel(24);
-	radio.openReadingPipe(0, 0x00FEEDF00D00ULL);
-	radio.openReadingPipe(1, 0x00FEEDF00D11ULL);
-	radio.openReadingPipe(2, 0x00FEEDF00D12ULL);
-	radio.openReadingPipe(3, 0x00FEEDF00D13ULL);
-	radio.openReadingPipe(4, 0x00FEEDF00D14ULL);
-	radio.openReadingPipe(5, 0x00FEEDF00D15ULL);
+	radio.openReadingPipe(0, (uint64_t)*"L1N00");
+	radio.openReadingPipe(1, (uint64_t)*"L1N01");
+	radio.openReadingPipe(2, (uint64_t)*"L1N02");
+	radio.openReadingPipe(3, (uint64_t)*"L1N03");
+	radio.openReadingPipe(4, (uint64_t)*"L1N04");
+	radio.openReadingPipe(5, (uint64_t)*"L1N05");
 	radio.setCRCLength(RF24_CRC_16);
 	radio.enableDynamicPayloads();
 	radio.setAutoAck(true);
+	radio.enableAckPayload();
 
 	radio.startListening();
 
@@ -94,7 +95,7 @@ void setup()   {
 	//
 	// LED Matrix
 	//
-	matrix.setIntensity(0); // Use a value between 0 and 15 for brightness
+	matrix.setIntensity(2); // Use a value between 0 and 15 for brightness
 }
 
 char* now() {
@@ -104,23 +105,21 @@ char* now() {
 	return buf;
 }
 
-const char* readRadio(uint8_t* pipenum = NULL) {
-	static char buff[RF_PAYLOAD_MAX + 1];
+String readRadio() {
+	char buff[RF_PAYLOAD_MAX + 1];
 	memset(buff, 0, RF_PAYLOAD_MAX + 1);
-	if (radio.available(pipenum)) {
+	if (radio.available())
 		radio.read(buff, radio.getDynamicPayloadSize());
-		return buff;
-	}
-	return 0;
+	return buff;
 }
 
 void loop() {
-	if (const char* buf = readRadio()) {
-		lastMsg  = " todo ";
-		lastMsg += buf;
-	}
+	const String& s = readRadio();
+	if (s.length())
+		lastMsg = s;
 	
 	String tape = now();
+	tape += " ";
 	tape += lastMsg;
 
 	for ( int i = 0 ; i < width * tape.length() + matrix.width() - 1 - spacer; i++ ) {
