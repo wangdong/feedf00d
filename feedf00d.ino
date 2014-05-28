@@ -49,16 +49,16 @@ void setup()   {
 	radio.begin();
 	radio.setDataRate(RF24_2MBPS);
 	radio.setChannel(24);
-	radio.openReadingPipe(0, 0x00FEEDF00D00ULL);
-	radio.openReadingPipe(1, 0x00FEEDF00D01ULL);
-	radio.openReadingPipe(2, 0x00FEEDF00D02ULL);
-	radio.openReadingPipe(3, 0x00FEEDF00D03ULL);
-	radio.openReadingPipe(4, 0x00FEEDF00D04ULL);
-	radio.openReadingPipe(5, 0x00FEEDF00D05ULL);
+	radio.openReadingPipe(0, (uint64_t)*"L0N00");
+	radio.openReadingPipe(1, (uint64_t)*"L0N01");
+	radio.openReadingPipe(2, (uint64_t)*"L0N02");
+	radio.openReadingPipe(3, (uint64_t)*"L0N03");
+	radio.openReadingPipe(4, (uint64_t)*"L0N04");
+	radio.openReadingPipe(5, (uint64_t)*"L0N05");
 	radio.setCRCLength(RF24_CRC_16);
 	radio.enableDynamicPayloads();
 	radio.setAutoAck(true);
-
+	radio.enableAckPayload();
 
 	radio.startListening();
 
@@ -142,7 +142,7 @@ void loop() {
 		display.println("E:no signal");
 	}
 	display.display();
-	delay(1000);
+	delay(500);
 }
 
 int serial_putc( char c, FILE * )
